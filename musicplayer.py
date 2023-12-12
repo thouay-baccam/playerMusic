@@ -1,102 +1,132 @@
-#Trouver les modules a importer 
-#Tkinter ou pygame?
-#OS?
-#Faire la logique
-#Interface graphique
-#Peut etre faire vraiment ça car ca serait bien d'avoir un media player autre que pot player, VLC ou autres qui datent trop
 import os
-import tkinter as tk
-from tkinter import filedialog
 import pygame
+from tkinter import Tk, Frame, Label, Button, Listbox, filedialog, ttk, Menu, END, ACTIVE
 
-class LecteurAudio:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Lecteur Audio")
-
-        self.playlist = []
+class LecteurMusique:
+    def __init__(self, maitre):
+        self.maitre = maitre
+        maitre.title("Le Lecteur Old School (Pour les vieux)")
+        maitre.geometry("600x375")
+        maitre.configure(bg='light gray')
 
         pygame.init()
         pygame.mixer.init()
 
-        self.current_track = tk.StringVar()
-        self.current_track.set("Aucune piste sélectionnée")
+        self.liste_lecture = Listbox(maitre, bg='white', fg='black', selectbackground='blue', selectforeground='white', width=50)
+        self.liste_lecture.pack(pady=10)
 
-        self.create_widgets()
+        self.boutons_lire_arreter = self.creer_boutons_lire_arreter(maitre)
+        self.boutons_lire_arreter.pack(pady=5)
 
-    def create_widgets(self):
-        # Boutons
-        tk.Button(self.root, text="Choisir une piste", command=self.choose_track).pack(pady=10)
-        tk.Button(self.root, text="Lancer la lecture", command=self.play).pack(pady=5)
-        tk.Button(self.root, text="Mettre en pause", command=self.pause).pack(pady=5)
-        tk.Button(self.root, text="Arrêter la lecture", command=self.stop).pack(pady=5)
-        tk.Button(self.root, text="Volume +", command=self.volume_up).pack(pady=5)
-        tk.Button(self.root, text="Volume -", command=self.volume_down).pack(pady=5)
-        tk.Button(self.root, text="Lire en boucle", command=self.toggle_loop).pack(pady=5)
-        tk.Button(self.root, text="Piste suivante", command=self.next_track).pack(pady=5)
-        tk.Button(self.root, text="Sélection aléatoire", command=self.random_track).pack(pady=5)
+        self.barre_progression = ttk.Scale(maitre, orient='horizontal', length=400, from_=0, to=100, value=0, command=self.definir_progression)
+        self.barre_progression.pack(pady=10)
 
-        # Barre de progression
-        self.progress_bar = tk.Scale(self.root, from_=0, to=100, orient=tk.HORIZONTAL, length=300, label="Progression")
-        self.progress_bar.pack(pady=10)
+        self.boutons = self.creer_boutons(maitre)
+        self.etiquette_etat = Label(maitre, text="", bg='light gray', fg='black')
+        self.etiquette_etat.pack(pady=5)
 
-        # Étiquette pour afficher la piste en cours
-        tk.Label(self.root, textvariable=self.current_track).pack(pady=10)
+        self.barre_menu = self.creer_barre_menu()
 
-    def choose_track(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Fichiers audio", "*.mp3;*.wav")])
-        if file_path:
-            self.playlist.append(file_path)
-            self.current_track.set(os.path.basename(file_path))
+        self.chemins_liste_lecture = []
 
-    def play(self):
-        if self.playlist:
-            pygame.mixer.music.load(self.playlist[0])
-            pygame.mixer.music.play()
-            self.root.after(100, self.update_progress)
+    def creer_boutons_lire_arreter(self, cadre):
+        cadre_boutons = Frame(cadre, bg='light gray')
+        cadre_boutons.pack(pady=10)
 
-    def pause(self):
-        pygame.mixer.music.pause()
+        bouton_lire = Button(cadre_boutons, text="Lire", command=self.lire_musique, bg='gray', fg='black')
+        bouton_lire.grid(row=0, column=0, padx=5)
 
-    def stop(self):
+        bouton_arreter = Button(cadre_boutons, text="Arrêter", command=self.arret_musique, bg='gray', fg='black')
+        bouton_arreter.grid(row=0, column=1, padx=5)
+
+        return cadre_boutons
+
+    def creer_boutons(self, cadre):
+        noms_boutons = ["Pause", "Reprendre", "Suivant", "Précédent"]
+        commandes_boutons = [self.pause_musique, self.reprise_musique, self.suivant_musique, self.precedent_musique]
+
+        cadre_boutons = Frame(cadre, bg='light gray')
+        cadre_boutons.pack(pady=10)
+
+        boutons = {}
+        for nom, commande in zip(noms_boutons, commandes_boutons):
+            bouton = Button(cadre_boutons, text=nom, command=commande, bg='gray', fg='black')
+            bouton.grid(row=0, column=noms_boutons.index(nom), padx=5)
+            boutons[nom] = bouton
+
+        return boutons
+
+    def creer_barre_menu(self):
+        barre_menu = Menu(self.maitre)
+        self.maitre.config(menu=barre_menu)
+
+        menu_fichier = Menu(barre_menu, tearoff=0)
+        barre_menu.add_cascade(label="Fichier", menu=menu_fichier)
+        menu_fichier.add_command(label="Ouvrir", command=self.ajouter_chanson)
+
+        return barre_menu
+
+    def ajouter_chanson(self):
+        chanson = filedialog.askopenfilename(defaultextension=".mp3", filetypes=[("Fichiers MP3", "*.mp3")])
+        if chanson:
+            nom_chanson = os.path.basename(chanson)
+            self.liste_lecture.insert(END, nom_chanson)
+            self.chemins_liste_lecture.append(chanson)
+            self.definir_dossier_musique(os.path.dirname(chanson))
+
+    def definir_dossier_musique(self, dossier):
+        self.dossier_musique = dossier
+
+    def lire_musique(self):
+        chanson_selectionnee = self.liste_lecture.get(ACTIVE)
+        chemin_chanson = os.path.join(self.dossier_musique, chanson_selectionnee)
+
+        try:
+            pygame.mixer.music.load(chemin_chanson)
+            pygame.mixer.music.play(loops=0)
+            self.etiquette_etat.config(text=f"En cours de lecture : {chanson_selectionnee}")
+            self.mise_a_jour_barre_progression()
+        except pygame.error as e:
+            self.etiquette_etat.config(text=f"Erreur : {e}")
+
+    def arret_musique(self):
         pygame.mixer.music.stop()
+        self.etiquette_etat.config(text="Musique arrêtée")
+        self.barre_progression.set(0)
 
-    def volume_up(self):
-        current_volume = pygame.mixer.music.get_volume()
-        pygame.mixer.music.set_volume(min(1.0, current_volume + 0.1))
+    def pause_musique(self):
+        pygame.mixer.music.pause()
+        self.etiquette_etat.config(text="Musique en pause")
 
-    def volume_down(self):
-        current_volume = pygame.mixer.music.get_volume()
-        pygame.mixer.music.set_volume(max(0.0, current_volume - 0.1))
+    def reprise_musique(self):
+        pygame.mixer.music.unpause()
+        self.etiquette_etat.config(text="Musique reprise")
 
-    def toggle_loop(self):
-        pygame.mixer.music.set_endevent(pygame.USEREVENT)
-        pygame.mixer.music.set_endevent(pygame.USEREVENT)
-        if pygame.mixer.music.get_endevent() == pygame.USEREVENT:
-            pygame.mixer.music.play(-1)  # -1 will loop the music indefinitely
+    def suivant_musique(self):
+        chanson_suivante = self.liste_lecture.curselection()[0] + 1
+        if chanson_suivante < len(self.chemins_liste_lecture):
+            self.liste_lecture.selection_clear(0, END)
+            self.liste_lecture.activate(chanson_suivante)
+            self.liste_lecture.selection_set(chanson_suivante)
+            self.lire_musique()
 
-    def update_progress(self):
+    def precedent_musique(self):
+        chanson_precedente = self.liste_lecture.curselection()[0] - 1
+        if chanson_precedente >= 0:
+            self.liste_lecture.selection_clear(0, END)
+            self.liste_lecture.activate(chanson_precedente)
+            self.liste_lecture.selection_set(chanson_precedente)
+            self.lire_musique()
+
+    def mise_a_jour_barre_progression(self):
+        duree = pygame.mixer.Sound(os.path.join(self.dossier_musique, self.liste_lecture.get(ACTIVE))).get_length()
+        self.barre_progression.config(to=duree)
+
+    def definir_progression(self, valeur):
         if pygame.mixer.music.get_busy():
-            current_time = pygame.mixer.music.get_pos() / 1000  # convert to seconds
-            total_time = pygame.mixer.Sound(self.playlist[0]).get_length()
-            progress_percent = (current_time / total_time) * 100
-            self.progress_bar.set(progress_percent)
-            self.root.after(100, self.update_progress)
-
-    def next_track(self):
-        if len(self.playlist) > 1:
-            self.playlist.pop(0)
-            self.play()
-        else:
-            self.stop()
-
-    def random_track(self):
-        if self.playlist:
-            import random
-            random.shuffle(self.playlist)
-            self.play()
+            pygame.mixer.music.set_pos(float(valeur))
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    lecteur_audio = LecteurAudio(root)
-    root.mainloop()
+    racine = Tk()
+    lecteur = LecteurMusique(racine)
+    racine.mainloop()
