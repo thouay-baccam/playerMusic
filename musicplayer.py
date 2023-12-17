@@ -8,7 +8,7 @@ class LecteurMusique:
         self.maitre = maitre
         maitre.title("LMPLV")  # LMPLV : Lecteur Musique Pour Les Vieux 
         maitre.geometry("600x375")
-        maitre.configure(bg='light gray') # L'interface en mode Windows 95/98, old school. 
+        maitre.configure(bg='light gray')  # L'interface en mode Windows 95/98, old school.
 
         # Initialisation de Pygame et Pygame.mixer
         pygame.init()
@@ -40,7 +40,7 @@ class LecteurMusique:
         self.barre_menu = self.creer_barre_menu()
 
         # Listes des chemins de chansons et dossier de musique
-        self.chemins_liste_lecture = []
+        self.chemins_liste_lecture = []  # Maintenant, stocke les chemins complets des chansons
         self.dossier_musique = ""
 
     def creer_boutons_lire_arreter(self, cadre):
@@ -90,7 +90,7 @@ class LecteurMusique:
             nom_chanson, extension = os.path.splitext(os.path.basename(chanson))
             if extension.lower() == ".mp3":
                 self.liste_lecture.insert(END, nom_chanson)
-                self.chemins_liste_lecture.append(chanson)
+                self.chemins_liste_lecture.append(chanson)  # Stocke le chemin complet de la chanson
                 self.definir_dossier_musique(os.path.dirname(chanson))
 
     def definir_dossier_musique(self, dossier):
@@ -100,7 +100,7 @@ class LecteurMusique:
     def lire_musique(self):
         # Lecture de la musique sélectionnée
         chanson_selectionnee = self.liste_lecture.get(ACTIVE)
-        chemin_chanson = os.path.join(self.dossier_musique, chanson_selectionnee)
+        chemin_chanson = self.chemins_liste_lecture[self.liste_lecture.curselection()[0]]
 
         try:
             pygame.mixer.music.load(chemin_chanson)
@@ -147,7 +147,7 @@ class LecteurMusique:
 
     def mise_a_jour_barre_progression(self):
         # Mise à jour de la barre de progression en fonction de la durée de la chanson
-        duree = pygame.mixer.Sound(os.path.join(self.dossier_musique, self.liste_lecture.get(ACTIVE))).get_length()
+        duree = pygame.mixer.Sound(self.chemins_liste_lecture[self.liste_lecture.curselection()[0]]).get_length()
         self.barre_progression.config(to=duree)
 
     def definir_progression(self, valeur):
